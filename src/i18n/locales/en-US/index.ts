@@ -16,6 +16,7 @@ import relationships from './relationships.json'
 import insight from './insight.json'
 import browser from './browser.json'
 import webAI from './webAI.json'
+import sessionLock from './sessionLock.json'
 
 export default {
   common,
@@ -36,4 +37,5 @@ export default {
   insight,
   browser,
   webAI,
+  sessionLock,
 }

@@ -18,6 +18,7 @@ type ToolEvent =
   | 'openMemberManagement'
   | 'openChatRecord'
   | 'openMessageExport'
+  | 'openSessionLock'
 
 const emit = defineEmits<{
   (e: ToolEvent): void
@@ -78,6 +79,13 @@ const tools = [
     miniHoverBg: 'hover:text-green-500',
     labelKey: 'analysis.messageExport.title',
   },
+  {
+    event: 'openSessionLock' as const,
+    icon: 'i-heroicons-lock-closed',
+    hoverColor: 'group-hover:text-amber-500',
+    miniHoverBg: 'hover:text-amber-500',
+    labelKey: 'sessionLock.menuLabel',
+  },
 ]
 
 const headerTools = [
@@ -94,6 +102,13 @@ const headerTools = [
     hoverColor: 'group-hover:text-green-500',
     miniHoverBg: 'hover:text-green-500',
     labelKey: 'analysis.messageExport.title',
+  },
+  {
+    event: 'openSessionLock' as const,
+    icon: 'i-heroicons-lock-closed',
+    hoverColor: 'group-hover:text-amber-500',
+    miniHoverBg: 'hover:text-amber-500',
+    labelKey: 'sessionLock.menuLabel',
   },
 ]
 

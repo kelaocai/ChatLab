@@ -9,17 +9,51 @@ let _baseUrl = '/_web'
 let _token = ''
 let _getToken: (() => string) | undefined
 let _on401: (() => void) | undefined
+let _getSessionUnlockToken: ((url: string) => string) | undefined
+let _onSessionLocked: ((sessionId: string) => void) | undefined
 
 export function configureHttpClient(config: {
   baseUrl?: string
   token?: string
   getToken?: (() => string) | null
   on401?: (() => void) | null
+  /** 按请求 URL 取会话解锁 token（会话密码锁），返回空串表示不附加 */
+  getSessionUnlockToken?: ((url: string) => string) | null
+  /** 收到 423 SESSION_LOCKED 响应时回调（参数为 URL 中解析出的 sessionId） */
+  onSessionLocked?: ((sessionId: string) => void) | null
 }): void {
   if (config.baseUrl !== undefined) _baseUrl = config.baseUrl
   if (config.token !== undefined) _token = config.token
   if (config.getToken !== undefined) _getToken = config.getToken ?? undefined
   if (config.on401 !== undefined) _on401 = config.on401 ?? undefined
+  if (config.getSessionUnlockToken !== undefined) _getSessionUnlockToken = config.getSessionUnlockToken ?? undefined
+  if (config.onSessionLocked !== undefined) _onSessionLocked = config.onSessionLocked ?? undefined
+}
+
+/** 匹配 /sessions/<id>/ 形式的 URL，返回 sessionId。 */
+export function parseSessionIdFromUrl(url: string): string | null {
+  const match = /\/sessions\/([^/?#]+)(?:\/|\?|#|$)/.exec(url)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+/** 会话相关请求附加 x-session-unlock header。 */
+function applySessionUnlockHeader(url: string, headers: Headers): void {
+  const token = _getSessionUnlockToken?.(url)
+  if (token && !headers.has('x-session-unlock')) headers.set('x-session-unlock', token)
+}
+
+/** 423 且 error.code 为 SESSION_LOCKED 时回调；clone 读取 body，不影响调用方。 */
+function handleSessionLocked(resp: Response, url: string): void {
+  if (resp.status !== 423 || !_onSessionLocked) return
+  const sessionId = parseSessionIdFromUrl(url)
+  if (!sessionId) return
+  resp
+    .clone()
+    .json()
+    .then((body) => {
+      if (body?.error?.code === 'SESSION_LOCKED') _onSessionLocked?.(sessionId)
+    })
+    .catch(() => {})
 }
 
 function resolveToken(): string {
@@ -64,9 +98,11 @@ export async function fetchWithAuth(url: string, init?: RequestInit): Promise<Re
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`)
   }
+  applySessionUnlockHeader(url, headers)
   const resolvedUrl = resolveFullUrl(url)
   const resp = await fetch(resolvedUrl, { ...init, headers })
   if (resp.status === 401 && _on401) _on401()
+  handleSessionLocked(resp, url)
   return resp
 }
 
@@ -74,12 +110,21 @@ function handle401(resp: Response): void {
   if (resp.status === 401 && _on401) _on401()
 }
 
+/** 构造鉴权 header，并按需附加会话解锁 token。 */
+function buildAuthHeaders(url: string): Record<string, string> {
+  const headers = getAuthHeaders()
+  const unlockToken = _getSessionUnlockToken?.(url)
+  if (unlockToken) headers['x-session-unlock'] = unlockToken
+  return headers
+}
+
 export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const resp = await fetch(`${_baseUrl}${path}`, {
-    headers: getAuthHeaders(),
+    headers: buildAuthHeaders(path),
     signal,
   })
   handle401(resp)
+  handleSessionLocked(resp, path)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`HTTP ${resp.status}: ${text}`)
@@ -92,13 +137,14 @@ export async function post<T>(path: string, body?: unknown, signal?: AbortSignal
   const resp = await fetch(`${_baseUrl}${path}`, {
     method: 'POST',
     headers: {
-      ...getAuthHeaders(),
+      ...buildAuthHeaders(path),
       ...(hasBody && { 'Content-Type': 'application/json' }),
     },
     ...(hasBody && { body: JSON.stringify(body) }),
     signal,
   })
   handle401(resp)
+  handleSessionLocked(resp, path)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`HTTP ${resp.status}: ${text}`)
@@ -157,9 +203,10 @@ export function analyticsPost<T>(path: string, body?: unknown): Promise<T> {
 export async function del<T = boolean>(path: string): Promise<T> {
   const resp = await fetch(`${_baseUrl}${path}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: buildAuthHeaders(path),
   })
   handle401(resp)
+  handleSessionLocked(resp, path)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`HTTP ${resp.status}: ${text}`)
@@ -172,12 +219,13 @@ export async function put<T>(path: string, body?: unknown): Promise<T> {
   const resp = await fetch(`${_baseUrl}${path}`, {
     method: 'PUT',
     headers: {
-      ...getAuthHeaders(),
+      ...buildAuthHeaders(path),
       ...(hasBody && { 'Content-Type': 'application/json' }),
     },
     ...(hasBody && { body: JSON.stringify(body) }),
   })
   handle401(resp)
+  handleSessionLocked(resp, path)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`HTTP ${resp.status}: ${text}`)
@@ -190,12 +238,13 @@ export async function patch<T>(path: string, body?: unknown): Promise<T> {
   const resp = await fetch(`${_baseUrl}${path}`, {
     method: 'PATCH',
     headers: {
-      ...getAuthHeaders(),
+      ...buildAuthHeaders(path),
       ...(hasBody && { 'Content-Type': 'application/json' }),
     },
     ...(hasBody && { body: JSON.stringify(body) }),
   })
   handle401(resp)
+  handleSessionLocked(resp, path)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`HTTP ${resp.status}: ${text}`)

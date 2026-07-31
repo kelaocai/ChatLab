@@ -15,6 +15,7 @@ import OwnerPromptModal from '@/components/analysis/member/OwnerPromptModal.vue'
 import IncrementalImportModal from '@/components/analysis/IncrementalImportModal.vue'
 const MessageExportModal = defineAsyncComponent(() => import('@/components/MessageExport/MessageExportModal.vue'))
 import ActionToolsPanel from '@/components/layout/ActionToolsPanel.vue'
+import SessionLockDialog from '@/components/layout/SessionLockDialog.vue'
 import LoadingState from '@/components/UI/LoadingState.vue'
 import { useSessionStore } from '@/stores/session'
 import { useLayoutStore } from '@/stores/layout'
@@ -43,6 +44,9 @@ const showMessageExportModal = ref(false)
 
 // 成员管理弹窗状态
 const showMemberManagementModal = ref(false)
+
+// 密码锁管理弹窗状态
+const showSessionLockDialog = ref(false)
 
 // 打开聊天记录查看器
 function openChatRecordViewer() {
@@ -202,6 +206,7 @@ const otherMemberAvatar = computed(() => {
         @open-member-management="showMemberManagementModal = true"
         @open-chat-record="openChatRecordViewer"
         @open-message-export="showMessageExportModal = true"
+        @open-session-lock="showSessionLockDialog = true"
       />
     </template>
 
@@ -209,6 +214,9 @@ const otherMemberAvatar = computed(() => {
     <div v-else class="flex h-full items-center justify-center">
       <p class="text-gray-500">{{ t('analysis.privateChat.loadError') }}</p>
     </div>
+
+    <!-- 密码锁管理弹窗 -->
+    <SessionLockDialog v-if="currentSessionId" v-model="showSessionLockDialog" :session-id="currentSessionId" />
 
     <!-- 语义索引弹窗（当前对话） -->
     <SemanticIndexSessionModal

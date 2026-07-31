@@ -13,6 +13,12 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: '/session-lock/:id',
+    name: 'session-lock',
+    component: () => import('@/pages/session-lock/index.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/',
     name: 'home',
     component: () => import('@/pages/home/index.vue'),
