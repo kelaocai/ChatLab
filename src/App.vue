@@ -21,7 +21,8 @@ import { useApiServerStore } from '@/stores/apiServer'
 import { initServices } from '@/services'
 import { initPreferencesSync } from '@/composables/usePreferencesSync'
 import { useWindowsTitleBarOverlay } from '@/composables/useWindowsTitleBarOverlay'
-import { configureHttpClient } from '@/services/utils/http'
+import { configureHttpClient, parseSessionIdFromUrl } from '@/services/utils/http'
+import { clearUnlockToken, getCachedUnlockToken } from '@/services/session-lock'
 import { IS_ELECTRON } from '@/utils/platform'
 import { PLATFORM_CAPABILITIES } from '@/utils/platform-capabilities'
 import { usePlatformService } from '@/services'
@@ -166,6 +167,23 @@ onMounted(async () => {
     }
     configureHttpClient({ getToken: () => authStore.token, on401 })
   }
+
+  // 会话密码锁：自动附加解锁 token；收到 423 SESSION_LOCKED 时跳转解锁页
+  configureHttpClient({
+    getSessionUnlockToken: (url) => {
+      const sessionId = parseSessionIdFromUrl(url)
+      return sessionId ? getCachedUnlockToken(sessionId) : ''
+    },
+    onSessionLocked: (sessionId) => {
+      if (router.currentRoute.value.name === 'session-lock') return
+      clearUnlockToken(sessionId)
+      router.push({
+        name: 'session-lock',
+        params: { id: sessionId },
+        query: { redirect: router.currentRoute.value.fullPath },
+      })
+    },
+  })
 
   if (isLoginPage.value) return
 
