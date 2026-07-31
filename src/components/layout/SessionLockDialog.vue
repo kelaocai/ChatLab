@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 会话密码锁管理对话框
- * 未锁定时设置密码；已锁定时支持修改密码和移除密码锁。
+ * 未锁定时设置密码；已锁定时修改密码。彻底移除密码锁走侧边栏锁图标的解锁对话框。
  */
 
 import { computed, ref, watch } from 'vue'
@@ -9,9 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
 import {
   cacheUnlockToken,
-  clearUnlockToken,
   getSessionLockStatus,
-  removeSessionLock,
   SessionLockError,
   setSessionLock,
   verifySessionLock,
@@ -36,8 +34,6 @@ const isOpen = computed({
 
 type Stage = 'loading' | 'set' | 'manage' | 'error'
 const stage = ref<Stage>('loading')
-// 已锁定时子模式：修改密码 / 移除密码锁
-const manageMode = ref<'change' | 'remove'>('change')
 
 const oldPassword = ref('')
 const password = ref('')
@@ -128,25 +124,6 @@ async function handleChange() {
     submitting.value = false
   }
 }
-
-async function handleRemove() {
-  if (!oldPassword.value) {
-    errorMessage.value = t('sessionLock.errorEmpty')
-    return
-  }
-  submitting.value = true
-  errorMessage.value = ''
-  try {
-    await removeSessionLock(props.sessionId, oldPassword.value)
-    clearUnlockToken(props.sessionId)
-    toast.success(t('sessionLock.removeSuccess'))
-    isOpen.value = false
-  } catch (err) {
-    errorMessage.value = translateSubmitError(err, 'sessionLock.errorWrong')
-  } finally {
-    submitting.value = false
-  }
-}
 </script>
 
 <template>
@@ -188,72 +165,37 @@ async function handleRemove() {
           <p v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</p>
         </form>
 
-        <!-- 已锁定：修改 / 移除 -->
-        <div v-else class="space-y-4">
-          <div class="flex gap-2">
-            <UButton
-              size="sm"
-              :color="manageMode === 'change' ? 'primary' : 'neutral'"
-              :variant="manageMode === 'change' ? 'soft' : 'ghost'"
-              @click="((manageMode = 'change'), (errorMessage = ''))"
-            >
-              {{ t('sessionLock.changeTab') }}
-            </UButton>
-            <UButton
-              size="sm"
-              :color="manageMode === 'remove' ? 'primary' : 'neutral'"
-              :variant="manageMode === 'remove' ? 'soft' : 'ghost'"
-              @click="((manageMode = 'remove'), (errorMessage = ''))"
-            >
-              {{ t('sessionLock.removeTab') }}
-            </UButton>
-          </div>
-
-          <form v-if="manageMode === 'change'" class="space-y-4" @submit.prevent="handleChange">
-            <UFormField :label="t('sessionLock.oldPasswordLabel')">
-              <UInput
-                v-model="oldPassword"
-                type="password"
-                :placeholder="t('sessionLock.passwordPlaceholder')"
-                autocomplete="off"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField :label="t('sessionLock.newPasswordLabel')">
-              <UInput
-                v-model="password"
-                type="password"
-                :placeholder="t('sessionLock.passwordPlaceholder')"
-                autocomplete="off"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField :label="t('sessionLock.confirmLabel')">
-              <UInput
-                v-model="confirmPassword"
-                type="password"
-                :placeholder="t('sessionLock.confirmPlaceholder')"
-                autocomplete="off"
-                class="w-full"
-              />
-            </UFormField>
-            <p v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</p>
-          </form>
-
-          <form v-else class="space-y-4" @submit.prevent="handleRemove">
-            <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('sessionLock.removeDescription') }}</p>
-            <UFormField :label="t('sessionLock.passwordLabel')">
-              <UInput
-                v-model="oldPassword"
-                type="password"
-                :placeholder="t('sessionLock.passwordPlaceholder')"
-                autocomplete="off"
-                class="w-full"
-              />
-            </UFormField>
-            <p v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</p>
-          </form>
-        </div>
+        <!-- 已锁定：修改密码 -->
+        <form v-else class="space-y-4" @submit.prevent="handleChange">
+          <UFormField :label="t('sessionLock.oldPasswordLabel')">
+            <UInput
+              v-model="oldPassword"
+              type="password"
+              :placeholder="t('sessionLock.passwordPlaceholder')"
+              autocomplete="off"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField :label="t('sessionLock.newPasswordLabel')">
+            <UInput
+              v-model="password"
+              type="password"
+              :placeholder="t('sessionLock.passwordPlaceholder')"
+              autocomplete="off"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField :label="t('sessionLock.confirmLabel')">
+            <UInput
+              v-model="confirmPassword"
+              type="password"
+              :placeholder="t('sessionLock.confirmPlaceholder')"
+              autocomplete="off"
+              class="w-full"
+            />
+          </UFormField>
+          <p v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</p>
+        </form>
       </div>
     </template>
 
@@ -267,14 +209,9 @@ async function handleRemove() {
             {{ t('common.confirm') }}
           </UButton>
         </template>
-        <template v-else-if="stage === 'manage' && manageMode === 'change'">
+        <template v-else-if="stage === 'manage'">
           <UButton color="primary" :loading="submitting" @click="handleChange">
             {{ t('common.confirm') }}
-          </UButton>
-        </template>
-        <template v-else-if="stage === 'manage' && manageMode === 'remove'">
-          <UButton color="error" :loading="submitting" @click="handleRemove">
-            {{ t('sessionLock.removeConfirm') }}
           </UButton>
         </template>
       </div>

@@ -12,10 +12,7 @@
   "confirmPlaceholder": "再次輸入密碼",
   "submit": "解鎖",
   "setDescription": "為此工作階段設定存取密碼（至少 4 位）。設定後檢視工作階段資料需要輸入密碼解鎖。",
-  "removeDescription": "輸入目前密碼以移除此工作階段的密碼鎖。",
   "changeTab": "修改密碼",
-  "removeTab": "移除密碼鎖",
-  "removeConfirm": "移除",
   "setSuccess": "密碼鎖已開啟",
   "changeSuccess": "密碼已修改",
   "removeSuccess": "密碼鎖已移除",
@@ -25,5 +22,9 @@
   "errorOldWrong": "目前密碼錯誤，請重試",
   "errorTooShort": "密碼至少 4 位",
   "errorMismatch": "兩次輸入的密碼不一致",
-  "errorNetwork": "網路連線失敗，請稍後重試"
+  "errorNetwork": "網路連線失敗，請稍後重試",
+  "iconUnlock": "解鎖工作階段",
+  "iconRelock": "重新上鎖",
+  "removePermanent": "徹底移除密碼鎖",
+  "unlockSuccess": "已解鎖"
 }

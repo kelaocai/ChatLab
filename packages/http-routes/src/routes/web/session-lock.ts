@@ -70,7 +70,8 @@ export class SessionLockStore {
     }
     this.data = {
       version: 1,
-      secret: typeof parsed.secret === 'string' && parsed.secret ? parsed.secret : crypto.randomBytes(32).toString('hex'),
+      secret:
+        typeof parsed.secret === 'string' && parsed.secret ? parsed.secret : crypto.randomBytes(32).toString('hex'),
       locks: parsed.locks && typeof parsed.locks === 'object' ? parsed.locks : {},
     }
     return this.data
@@ -86,6 +87,10 @@ export class SessionLockStore {
 
   isLocked(sessionId: string): boolean {
     return sessionId in this.load().locks
+  }
+
+  listLockedIds(): string[] {
+    return Object.keys(this.load().locks)
   }
 
   setLock(sessionId: string, password: string): void {
@@ -175,6 +180,8 @@ export function registerSessionLockRoutes(server: FastifyInstance, ctx: SessionL
     })
   })
 
+  server.get('/_web/session-locks', async () => ({ lockedIds: store.listLockedIds() }))
+
   server.get<{ Params: { id: string } }>('/_web/sessions/:id/lock', async (request) => {
     const { id } = request.params
     return { locked: store.isLocked(id), unlocked: hasValidUnlockHeader(request, store, id) }
@@ -188,7 +195,10 @@ export function registerSessionLockRoutes(server: FastifyInstance, ctx: SessionL
       if (typeof password !== 'string' || password.length < SESSION_LOCK_MIN_PASSWORD_LENGTH) {
         return reply.code(400).send({
           success: false,
-          error: { code: 'INVALID_PASSWORD', message: `Password must be at least ${SESSION_LOCK_MIN_PASSWORD_LENGTH} characters.` },
+          error: {
+            code: 'INVALID_PASSWORD',
+            message: `Password must be at least ${SESSION_LOCK_MIN_PASSWORD_LENGTH} characters.`,
+          },
         })
       }
       if (store.isLocked(id)) {

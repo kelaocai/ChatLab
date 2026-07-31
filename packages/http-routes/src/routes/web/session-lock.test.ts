@@ -103,6 +103,15 @@ describe('session lock routes and enforcement hook', () => {
     return server.inject({ method: 'POST', url: `/_web/sessions/${id}/lock/verify`, payload: { password } })
   }
 
+  it('lists locked session ids in bulk', async () => {
+    assert.deepEqual((await server.inject({ method: 'GET', url: '/_web/session-locks' })).json(), { lockedIds: [] })
+    await lockSession('s1')
+    await lockSession('s2')
+    const res = await server.inject({ method: 'GET', url: '/_web/session-locks' })
+    assert.equal(res.statusCode, 200)
+    assert.deepEqual(res.json().lockedIds.sort(), ['s1', 's2'])
+  })
+
   it('enforces 423 on web and REST content routes for locked sessions', async () => {
     await lockSession()
     for (const url of ['/_web/sessions/s1/sql', '/api/v1/sessions/s1/messages']) {
@@ -165,7 +174,11 @@ describe('session lock routes and enforcement hook', () => {
 
   it('requires the old password or a valid token to change the password', async () => {
     await lockSession()
-    const denied = await server.inject({ method: 'PUT', url: '/_web/sessions/s1/lock', payload: { password: 'new-pw' } })
+    const denied = await server.inject({
+      method: 'PUT',
+      url: '/_web/sessions/s1/lock',
+      payload: { password: 'new-pw' },
+    })
     assert.equal(denied.statusCode, 401)
     const changed = await server.inject({
       method: 'PUT',
@@ -183,7 +196,11 @@ describe('session lock routes and enforcement hook', () => {
 
   it('removes the lock with the correct password', async () => {
     await lockSession()
-    const denied = await server.inject({ method: 'DELETE', url: '/_web/sessions/s1/lock', payload: { password: 'nope' } })
+    const denied = await server.inject({
+      method: 'DELETE',
+      url: '/_web/sessions/s1/lock',
+      payload: { password: 'nope' },
+    })
     assert.equal(denied.statusCode, 401)
     const removed = await server.inject({
       method: 'DELETE',

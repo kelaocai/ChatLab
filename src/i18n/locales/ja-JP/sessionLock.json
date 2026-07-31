@@ -12,10 +12,7 @@
   "confirmPlaceholder": "もう一度パスワードを入力",
   "submit": "ロック解除",
   "setDescription": "このセッションにアクセスパスワード（4文字以上）を設定します。設定後、セッションの閲覧にはロック解除が必要になります。",
-  "removeDescription": "現在のパスワードを入力して、このセッションのパスワードロックを解除します。",
   "changeTab": "パスワード変更",
-  "removeTab": "ロックを解除",
-  "removeConfirm": "解除",
   "setSuccess": "パスワードロックを有効にしました",
   "changeSuccess": "パスワードを変更しました",
   "removeSuccess": "パスワードロックを解除しました",
@@ -25,5 +22,9 @@
   "errorOldWrong": "現在のパスワードが正しくありません。もう一度お試しください",
   "errorTooShort": "パスワードは4文字以上で入力してください",
   "errorMismatch": "入力されたパスワードが一致しません",
-  "errorNetwork": "ネットワークエラーが発生しました。後でもう一度お試しください"
+  "errorNetwork": "ネットワークエラーが発生しました。後でもう一度お試しください",
+  "iconUnlock": "セッションのロックを解除",
+  "iconRelock": "セッションを再ロック",
+  "removePermanent": "パスワードロックを完全に削除",
+  "unlockSuccess": "ロックを解除しました"
 }

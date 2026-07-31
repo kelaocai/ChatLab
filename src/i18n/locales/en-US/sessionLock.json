@@ -12,10 +12,7 @@
   "confirmPlaceholder": "Enter the password again",
   "submit": "Unlock",
   "setDescription": "Set an access password for this session (at least 4 characters). Once set, viewing this session requires unlocking.",
-  "removeDescription": "Enter the current password to remove the lock from this session.",
   "changeTab": "Change Password",
-  "removeTab": "Remove Lock",
-  "removeConfirm": "Remove",
   "setSuccess": "Password lock enabled",
   "changeSuccess": "Password changed",
   "removeSuccess": "Password lock removed",
@@ -25,5 +22,9 @@
   "errorOldWrong": "Incorrect current password, please try again",
   "errorTooShort": "Password must be at least 4 characters",
   "errorMismatch": "The two passwords do not match",
-  "errorNetwork": "Network error, please try again later"
+  "errorNetwork": "Network error, please try again later",
+  "iconUnlock": "Unlock session",
+  "iconRelock": "Relock session",
+  "removePermanent": "Remove password lock permanently",
+  "unlockSuccess": "Unlocked"
 }

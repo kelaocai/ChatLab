@@ -3,8 +3,12 @@
  *
  * 封装 /_web/sessions/:id/lock 系列 API，并在 localStorage 缓存解锁 token。
  * token 有效期 7 天，读取时过期即删；请求失败由调用方按未锁定降级处理。
+ *
+ * 模块级 reactive 状态（lockedIds / unlockedIds）供侧边栏图标、路由守卫和对话框共享：
+ * 挂载时通过 initSessionLockStates() 拉取一次批量锁定状态，之后由本模块的写操作本地同步。
  */
 
+import { reactive } from 'vue'
 import { fetchWithAuth } from './utils/http'
 
 const TOKEN_KEY_PREFIX = 'chatlab_session_unlock_'
@@ -19,6 +23,22 @@ export interface SessionLockStatus {
 interface CachedUnlockToken {
   token: string
   expiresAt: number
+}
+
+/** 会话锁共享状态：lockedIds 来自后端批量接口，unlockedIds 与本地 token 缓存同步。 */
+const sessionLockState = reactive({
+  lockedIds: new Set<string>(),
+  unlockedIds: new Set<string>(),
+})
+
+/** 会话是否已启用密码锁（状态未拉取或拉取失败时按未锁处理）。 */
+export function isSessionLocked(sessionId: string): boolean {
+  return sessionLockState.lockedIds.has(sessionId)
+}
+
+/** 会话是否已锁且当前持有有效解锁 token。 */
+export function isSessionUnlocked(sessionId: string): boolean {
+  return sessionLockState.unlockedIds.has(sessionId)
 }
 
 /** 密码锁 API 错误，status 用于区分 400（密码太短）/ 401（密码错误）等。 */
@@ -51,10 +71,38 @@ export function getCachedUnlockToken(sessionId: string): string {
 export function cacheUnlockToken(sessionId: string, token: string, expiresAt: number): void {
   const cached: CachedUnlockToken = { token, expiresAt }
   localStorage.setItem(TOKEN_KEY_PREFIX + sessionId, JSON.stringify(cached))
+  sessionLockState.unlockedIds.add(sessionId)
 }
 
 export function clearUnlockToken(sessionId: string): void {
   localStorage.removeItem(TOKEN_KEY_PREFIX + sessionId)
+  sessionLockState.unlockedIds.delete(sessionId)
+}
+
+/** 重新上锁：仅清除本地解锁 token，下次访问该会话需重新输入密码。 */
+export function relockSession(sessionId: string): void {
+  clearUnlockToken(sessionId)
+}
+
+/**
+ * 初始化共享状态：扫描本地 token 缓存（过期即清），再拉取后端批量锁定状态。
+ * 拉取失败（Web WASM 无此后端、网络错误等）按空集处理，不影响正常平台。
+ */
+export async function initSessionLockStates(): Promise<void> {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i)
+    if (!key?.startsWith(TOKEN_KEY_PREFIX)) continue
+    const sessionId = key.slice(TOKEN_KEY_PREFIX.length)
+    if (getCachedUnlockToken(sessionId)) sessionLockState.unlockedIds.add(sessionId)
+  }
+  try {
+    const resp = await fetchWithAuth('/_web/session-locks')
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const body = (await resp.json()) as { lockedIds?: string[] }
+    sessionLockState.lockedIds = new Set(body.lockedIds ?? [])
+  } catch {
+    sessionLockState.lockedIds = new Set()
+  }
 }
 
 async function requestLock<T>(sessionId: string, init?: RequestInit): Promise<T> {
@@ -77,6 +125,9 @@ export function setSessionLock(sessionId: string, password: string, oldPassword?
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(oldPassword ? { password, oldPassword } : { password }),
+  }).then((result) => {
+    sessionLockState.lockedIds.add(sessionId)
+    return result
   })
 }
 
@@ -86,6 +137,11 @@ export function removeSessionLock(sessionId: string, password: string): Promise<
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password }),
+  }).then((result) => {
+    sessionLockState.lockedIds.delete(sessionId)
+    sessionLockState.unlockedIds.delete(sessionId)
+    localStorage.removeItem(TOKEN_KEY_PREFIX + sessionId)
+    return result
   })
 }
 

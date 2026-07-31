@@ -21,6 +21,8 @@ import { CompactTabs } from '@/components/navigation'
 import { useSessionStore } from '@/stores/session'
 import { useLayoutStore } from '@/stores/layout'
 import { usePlatformService } from '@/services'
+import { initSessionLockStates, isSessionLocked, isSessionUnlocked, relockSession } from '@/services/session-lock'
+import SessionUnlockDialog from './sidebar/SessionUnlockDialog.vue'
 import { IS_ELECTRON } from '@/utils/platform'
 import logoSvg from '@/assets/images/logo.svg'
 import { focusExposedInput, type ExposedInputRef } from './sidebar/input-focus'
@@ -82,6 +84,10 @@ const showSearch = ref(false)
 const searchQuery = ref('')
 const sessionListRef = ref<HTMLElement | null>(null)
 
+// 会话密码锁：解锁对话框目标会话
+const showUnlockDialog = ref(false)
+const unlockTargetSessionId = ref('')
+
 // 筛选 Tab 配置
 const filterTabItems = computed(() => [
   { id: 'all', label: t('layout.filter.all') },
@@ -127,6 +133,8 @@ let unlistenImportCompleted: (() => void) | null = null
 
 onMounted(async () => {
   sessionStore.loadSessions()
+  // 拉取会话密码锁状态；失败（无后端平台）按空集处理
+  void initSessionLockStates()
   try {
     version.value = await usePlatformService().getVersion()
     if (props.backendFeatures) void checkUpdateNotice()
@@ -160,6 +168,20 @@ function openSession(session: AnalysisSession) {
     params: { id: session.id },
     query: route.query,
   })
+}
+
+// 点击会话锁图标：已解锁则直接重新上锁；未解锁则弹出解锁对话框
+function handleLockIconClick(session: AnalysisSession) {
+  if (isSessionUnlocked(session.id)) {
+    relockSession(session.id)
+    // 正在查看该会话时，重新上锁后立即跳回解锁页
+    if (route.params.id === session.id) {
+      router.push({ name: 'session-lock', params: { id: session.id }, query: { redirect: route.fullPath } })
+    }
+    return
+  }
+  unlockTargetSessionId.value = session.id
+  showUnlockDialog.value = true
 }
 
 function readUpdateCheckCache(): UpdateNoticeCache | null {
@@ -621,11 +643,34 @@ function getAvatarColorClass(session: AnalysisSession, isActive: boolean) {
                       <p class="truncate text-xs font-medium">
                         {{ virtualSessionAt(virtualItem.index).name }}
                       </p>
-                      <UIcon
-                        v-if="sessionStore.isPinned(virtualSessionAt(virtualItem.index).id)"
-                        name="i-lucide-pin"
-                        class="h-3 w-3 shrink-0 text-gray-400/80 rotate-45"
-                      />
+                      <span class="flex shrink-0 items-center gap-1">
+                        <!-- 密码锁图标：锁定 / 已解锁两种状态，点击不触发会话跳转 -->
+                        <button
+                          v-if="isSessionLocked(virtualSessionAt(virtualItem.index).id)"
+                          type="button"
+                          class="flex items-center justify-center text-gray-400/80 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                          :title="
+                            isSessionUnlocked(virtualSessionAt(virtualItem.index).id)
+                              ? t('sessionLock.iconRelock')
+                              : t('sessionLock.iconUnlock')
+                          "
+                          @click.stop="handleLockIconClick(virtualSessionAt(virtualItem.index))"
+                        >
+                          <UIcon
+                            :name="
+                              isSessionUnlocked(virtualSessionAt(virtualItem.index).id)
+                                ? 'i-heroicons-lock-open'
+                                : 'i-heroicons-lock-closed'
+                            "
+                            class="h-3 w-3"
+                          />
+                        </button>
+                        <UIcon
+                          v-if="sessionStore.isPinned(virtualSessionAt(virtualItem.index).id)"
+                          name="i-lucide-pin"
+                          class="h-3 w-3 shrink-0 text-gray-400/80 rotate-45"
+                        />
+                      </span>
                     </div>
                     <p class="truncate text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-none">
                       {{ t('layout.sessionInfo', { count: virtualSessionAt(virtualItem.index).messageCount }) }}
@@ -642,6 +687,9 @@ function getAvatarColorClass(session: AnalysisSession, isActive: boolean) {
         class="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent dark:from-[#202024]"
       />
     </div>
+
+    <!-- 会话解锁对话框 -->
+    <SessionUnlockDialog v-model="showUnlockDialog" :session-id="unlockTargetSessionId" />
 
     <!-- Rename Modal -->
     <UModal v-model:open="showRenameModal" :ui="{ content: 'z-50' }">
