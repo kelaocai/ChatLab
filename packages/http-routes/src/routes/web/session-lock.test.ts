@@ -149,10 +149,28 @@ describe('session lock routes and enforcement hook', () => {
     assert.equal(res.statusCode, 200)
   })
 
+  it('accepts any matching token from a comma-separated header', async () => {
+    await lockSession()
+    const { token } = (await verifySession()).json()
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/v1/sessions/s1/messages',
+      headers: { 'x-session-unlock': `bogus.token, ${token}` },
+    })
+    assert.equal(res.statusCode, 200)
+    const onlyBogus = await server.inject({
+      method: 'GET',
+      url: '/api/v1/sessions/s1/messages',
+      headers: { 'x-session-unlock': 'bogus.token, another.one' },
+    })
+    assert.equal(onlyBogus.statusCode, 423)
+  })
+
   it('blocks AI entry points carrying a locked sessionId', async () => {
     await lockSession()
     const create = await server.inject({ method: 'POST', url: '/_web/ai/chats', payload: { sessionId: 's1' } })
     assert.equal(create.statusCode, 423)
+    assert.equal(create.json().error.sessionId, 's1')
     const stream = await server.inject({ method: 'POST', url: '/_web/ai/agent/stream', payload: { sessionId: 's1' } })
     assert.equal(stream.statusCode, 423)
     const { token } = (await verifySession()).json()

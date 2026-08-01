@@ -45,13 +45,14 @@ function applySessionUnlockHeader(url: string, headers: Headers): void {
 /** 423 且 error.code 为 SESSION_LOCKED 时回调；clone 读取 body，不影响调用方。 */
 function handleSessionLocked(resp: Response, url: string): void {
   if (resp.status !== 423 || !_onSessionLocked) return
-  const sessionId = parseSessionIdFromUrl(url)
-  if (!sessionId) return
   resp
     .clone()
     .json()
     .then((body) => {
-      if (body?.error?.code === 'SESSION_LOCKED') _onSessionLocked?.(sessionId)
+      if (body?.error?.code !== 'SESSION_LOCKED') return
+      // URL 无法解析 sessionId 时（如 AI 入口）回退用服务端返回的 sessionId
+      const sessionId = parseSessionIdFromUrl(url) ?? body.error.sessionId
+      if (typeof sessionId === 'string' && sessionId) _onSessionLocked?.(sessionId)
     })
     .catch(() => {})
 }

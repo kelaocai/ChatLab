@@ -154,10 +154,19 @@ export function extractLockedSessionId(request: FastifyRequest): string | null {
   return null
 }
 
+/**
+ * The header may carry multiple comma-separated tokens: clients cannot always
+ * tell the target session from the URL (e.g. AI endpoints take sessionId in
+ * the body), so they attach every cached token and we accept any match.
+ */
 function hasValidUnlockHeader(request: FastifyRequest, store: SessionLockStore, sessionId: string): boolean {
   const header = request.headers[SESSION_LOCK_HEADER]
-  const token = Array.isArray(header) ? header[0] : header
-  return typeof token === 'string' && store.verifyUnlockToken(token, sessionId)
+  const raw = Array.isArray(header) ? header[0] : header
+  if (typeof raw !== 'string' || !raw) return false
+  return raw
+    .split(',')
+    .map((t) => t.trim())
+    .some((token) => token && store.verifyUnlockToken(token, sessionId))
 }
 
 export type SessionLockRouteContext = Pick<RuntimeRouteContext, 'pathProvider'>
@@ -176,7 +185,11 @@ export function registerSessionLockRoutes(server: FastifyInstance, ctx: SessionL
     if (hasValidUnlockHeader(request, store, sessionId)) return
     return reply.code(423).send({
       success: false,
-      error: { code: SESSION_LOCK_ERROR_CODE, message: 'Session is locked. Password verification required.' },
+      error: {
+        code: SESSION_LOCK_ERROR_CODE,
+        message: 'Session is locked. Password verification required.',
+        sessionId,
+      },
     })
   })
 

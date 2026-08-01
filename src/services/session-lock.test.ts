@@ -9,6 +9,7 @@ import { beforeEach, test } from 'node:test'
 import {
   cacheUnlockToken,
   clearUnlockToken,
+  getAllValidUnlockTokens,
   getCachedUnlockToken,
   initSessionLockStates,
   isSessionLocked,
@@ -64,6 +65,18 @@ test('relockSession clears the cached token and unlocked state', () => {
   relockSession('s-relock')
   assert.equal(getCachedUnlockToken('s-relock'), '')
   assert.equal(isSessionUnlocked('s-relock'), false)
+})
+
+test('getAllValidUnlockTokens joins only valid tokens with commas', () => {
+  cacheUnlockToken('s-a', 'tok-a', FUTURE)
+  cacheUnlockToken('s-b', 'tok-b', FUTURE)
+  cacheUnlockToken('s-expired', 'tok-x', Date.now() - 1000)
+  localStorage.setItem('unrelated_key', 'value')
+  assert.equal(getAllValidUnlockTokens(), 'tok-a,tok-b')
+})
+
+test('getAllValidUnlockTokens returns empty string when nothing is cached', () => {
+  assert.equal(getAllValidUnlockTokens(), '')
 })
 
 test('clearUnlockToken removes both cache and unlocked state', () => {

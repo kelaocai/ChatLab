@@ -22,7 +22,7 @@ import { initServices } from '@/services'
 import { initPreferencesSync } from '@/composables/usePreferencesSync'
 import { useWindowsTitleBarOverlay } from '@/composables/useWindowsTitleBarOverlay'
 import { configureHttpClient, parseSessionIdFromUrl } from '@/services/utils/http'
-import { clearUnlockToken, getCachedUnlockToken } from '@/services/session-lock'
+import { clearUnlockToken, getAllValidUnlockTokens, getCachedUnlockToken } from '@/services/session-lock'
 import { IS_ELECTRON } from '@/utils/platform'
 import { PLATFORM_CAPABILITIES } from '@/utils/platform-capabilities'
 import { usePlatformService } from '@/services'
@@ -172,7 +172,9 @@ onMounted(async () => {
   configureHttpClient({
     getSessionUnlockToken: (url) => {
       const sessionId = parseSessionIdFromUrl(url)
-      return sessionId ? getCachedUnlockToken(sessionId) : ''
+      // URL 能解析出 sessionId 时精确匹配；否则（如 /_web/ai/chats 用 body/query 传 sessionId）
+      // 附上全部有效 token，由服务端按目标会话匹配其一
+      return (sessionId ? getCachedUnlockToken(sessionId) : '') || getAllValidUnlockTokens()
     },
     onSessionLocked: (sessionId) => {
       if (router.currentRoute.value.name === 'session-lock') return

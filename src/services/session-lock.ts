@@ -68,6 +68,21 @@ export function getCachedUnlockToken(sessionId: string): string {
   }
 }
 
+/**
+ * 逗号拼接所有有效的缓存 token。服务端会接受其中任意匹配的一个——
+ * 用于 URL 中无法解析 sessionId 的请求（如 /_web/ai/chats 的 body/query 携带 sessionId）。
+ */
+export function getAllValidUnlockTokens(): string {
+  const tokens: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (!key?.startsWith(TOKEN_KEY_PREFIX)) continue
+    const token = getCachedUnlockToken(key.slice(TOKEN_KEY_PREFIX.length))
+    if (token) tokens.push(token)
+  }
+  return tokens.join(',')
+}
+
 export function cacheUnlockToken(sessionId: string, token: string, expiresAt: number): void {
   const cached: CachedUnlockToken = { token, expiresAt }
   localStorage.setItem(TOKEN_KEY_PREFIX + sessionId, JSON.stringify(cached))
